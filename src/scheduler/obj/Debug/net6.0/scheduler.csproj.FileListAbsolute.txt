@@ -1,0 +1,12 @@
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/bin/Debug/net6.0/scheduler.deps.json
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/bin/Debug/net6.0/scheduler.dll
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/bin/Debug/net6.0/ref/scheduler.dll
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/bin/Debug/net6.0/scheduler.pdb
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.csproj.AssemblyReference.cache
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.GeneratedMSBuildEditorConfig.editorconfig
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.AssemblyInfoInputs.cache
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.AssemblyInfo.cs
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.csproj.CoreCompileInputs.cache
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.dll
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/ref/scheduler.dll
+/home/jiri/git/personal/dotnet-scheduler/src/scheduler/obj/Debug/net6.0/scheduler.pdb
