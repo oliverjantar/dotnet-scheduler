@@ -2,25 +2,25 @@
 using Microsoft.Extensions.Logging;
 
 namespace scheduler;
+/// <summary>
+/// Class responsible for scheduling and executing functions at a given time.
+/// </summary>
 public class Executor
-{
-    public int Test(){
-        return 1;
-    }
-
-    private Executor()
-    {
-    }
-
+{ 
+    private readonly ILogger<Executor> _logger;
+    private readonly ConcurrentDictionary<Guid, CancellationToken> _jobSchedules;
     public Executor(ILogger<Executor> logger)
     {
         _logger = logger;
         _jobSchedules = new ConcurrentDictionary<Guid, CancellationToken>();
     }
-
-    private readonly ILogger<Executor> _logger;
-    private readonly ConcurrentDictionary<Guid, CancellationToken> _jobSchedules;
-
+    /// <summary>
+    /// Schedules a function to be executed at a given time.
+    /// </summary>
+    /// <param name="next">DateTime when callback will be executed</param>
+    /// <param name="callback">Function to be executed</param>
+    /// <param name="ct">Cancellation token for this method, not the inner scheduled function</param>
+    /// <returns>Id of the scheduled function</returns>
     public Guid Schedule(DateTime next, Func<CancellationToken, Task> callback, CancellationToken ct){
         var cancellationTokenSource = new CancellationTokenSource();
         var scheduleId = Guid.NewGuid();
@@ -42,7 +42,10 @@ public class Executor
             }
             catch (AggregateException e)
             {
-                _logger.LogError(e, "Aggregate exception while scheduling job ");
+                foreach (var ex in e.InnerExceptions) 
+                {
+                    _logger.LogError(ex, "Aggregate exception while scheduling job");
+                }
             }
             catch (Exception e)
             {
@@ -55,7 +58,10 @@ public class Executor
             }
             catch (AggregateException e)
             {
-                _logger.LogError(e, "Aggregate exception while executing callback {scheduleId}", scheduleId);
+                foreach (var ex in e.InnerExceptions) 
+                {
+                    _logger.LogError(e, "Aggregate exception while executing callback {scheduleId}", scheduleId);
+                }
             }
             catch (Exception e)
             {
