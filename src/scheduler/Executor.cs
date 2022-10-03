@@ -15,13 +15,13 @@ public class Executor
     public Executor(ILogger<Executor> logger)
     {
         _logger = logger;
-        _jobSchedules = new ConcurrentDictionary<Guid, CancellationTokenSource>();
+        _jobSchedules = new ConcurrentDictionary<Guid, CancellationToken>();
     }
 
     private readonly ILogger<Executor> _logger;
-    private readonly ConcurrentDictionary<Guid,CancellationTokenSource> _jobSchedules;
+    private readonly ConcurrentDictionary<Guid, CancellationToken> _jobSchedules;
 
-    public Guid Schedule(DateTime next, Func<Task> callback){
+    public Guid Schedule(DateTime next, Func<CancellationToken, Task> callback, CancellationToken ct){
         var cancellationTokenSource = new CancellationTokenSource();
         var scheduleId = Guid.NewGuid();
 
@@ -36,7 +36,7 @@ public class Executor
                 while (delay > 0)
                 {
                     var currentDelay = delay > UInt32.MaxValue - 1 ? UInt32.MaxValue - 1 : delay;
-                    await Task.Delay(TimeSpan.FromMilliseconds((UInt32)currentDelay), cancellationTokenSource.Token);
+                    await Task.Delay(TimeSpan.FromMilliseconds((UInt32)currentDelay), ct);
                     delay -= currentDelay;
                 }
             }
@@ -51,7 +51,7 @@ public class Executor
 
             try
             {
-                await callback();
+                await callback(cancellationTokenSource.Token);
             }
             catch (AggregateException e)
             {
@@ -62,13 +62,12 @@ public class Executor
                 _logger.LogError(e, "Exception happened while executing callback {scheduleId}", scheduleId);
             }
 
-            CancellationTokenSource tokenSource;
-            if (!_jobSchedules.TryRemove(scheduleId, out tokenSource)){
+            if (!_jobSchedules.TryRemove(scheduleId, out _)){
                 _logger.LogError("ScheduleId does not exist in the _jobSchedules {scheduleId}", scheduleId);
             }
-        });
+        }, cancellationTokenSource.Token);
 
-        _jobSchedules.TryAdd(scheduleId, cancellationTokenSource);
+        _jobSchedules.TryAdd(scheduleId, cancellationTokenSource.Token);
         return scheduleId;
     }
 }
