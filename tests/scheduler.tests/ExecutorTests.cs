@@ -9,23 +9,21 @@ namespace scheduler.tests;
 
 public class ExecutorTests
 {
-    private Func<CancellationToken,Task> callback = cancellationToken => Task.CompletedTask;
-    
-    
     [Fact]
     public async void ExecutesScheduledFunction()
     {
-        
         var logger = new Mock<ILogger<Executor>>();
         var executor = new Executor(logger.Object);
-
         var mockCallback = new Mock<Func<CancellationToken, Task>>();
 
-        var next = DateTime.UtcNow;
+        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow, mockCallback.Object);
         
+        Assert.NotEqual(Guid.Empty,scheduleId);
+        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
         
+        await task;
 
-
-        // Assert.Equal(1,e.Test());
+        mockCallback.Verify(x=>x(It.IsAny<CancellationToken>()),Times.Once);
+        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
     }
 }
