@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 [assembly: InternalsVisibleTo("scheduler.tests")]
+
 namespace scheduler;
 
 /// <summary>
@@ -11,12 +12,12 @@ namespace scheduler;
 public class Executor
 {
     private readonly ILogger<Executor> _logger;
-    internal readonly ConcurrentDictionary<Guid, CancellationToken> JobSchedules;
+    internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> JobSchedules;
 
     public Executor(ILogger<Executor> logger)
     {
         _logger = logger;
-        JobSchedules = new ConcurrentDictionary<Guid, CancellationToken>();
+        JobSchedules = new ConcurrentDictionary<Guid, CancellationTokenSource>();
     }
 
     /// <summary>
@@ -38,7 +39,7 @@ public class Executor
             {
                 //Task.Delay takes UInt32, max value is ~49 days. If task is scheduled for more than that, it needs to be delayed several times in a loop.
                 var delay = (double)timeSpan.TotalMilliseconds;
-                _logger.LogInformation("Executing {scheduleId} in {delay}ms", scheduleId,delay);
+                _logger.LogInformation("Executing {scheduleId} in {delay}ms", scheduleId, delay);
                 while (delay > 0)
                 {
                     var currentDelay = delay > UInt32.MaxValue - 1 ? UInt32.MaxValue - 1 : delay;
@@ -81,9 +82,16 @@ public class Executor
             {
                 _logger.LogError("ScheduleId does not exist in the _jobSchedules {scheduleId}", scheduleId);
             }
-        }, cancellationTokenSource.Token);//.ConfigureAwait(false);
+        }, cancellationTokenSource.Token); //.ConfigureAwait(false);
 
-        JobSchedules.TryAdd(scheduleId, cancellationTokenSource.Token);
+        JobSchedules.TryAdd(scheduleId, cancellationTokenSource);
         return (scheduleId, task);
+    }
+
+    public bool Cancel(Guid scheduleId)
+    {
+        if (!JobSchedules.TryRemove(scheduleId, out var cts) || !cts.Token.CanBeCanceled) return false;
+        cts.Cancel();
+        return true;
     }
 }
