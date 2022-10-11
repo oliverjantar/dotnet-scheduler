@@ -24,7 +24,6 @@ public class Executor
     /// </summary>
     /// <param name="next">DateTime when callback will be executed</param>
     /// <param name="callback">Function to be executed</param>
-    /// <param name="ct">Cancellation token for this method, not the inner scheduled function</param>
     /// <returns>Id of the scheduled function. Task of a scheduled function - it is used only in tests, in production it works as fire and forget</returns>
     public (Guid, Task) Schedule(DateTime next, Func<CancellationToken, Task> callback)
     {
