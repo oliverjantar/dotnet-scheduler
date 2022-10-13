@@ -38,7 +38,7 @@ public class Executor
             try
             {
                 //Task.Delay takes UInt32, max value is ~49 days. If task is scheduled for more than that, it needs to be delayed several times in a loop.
-                var delay = (double)timeSpan.TotalMilliseconds;
+                var delay = timeSpan.TotalMilliseconds;
                 _logger.LogInformation("Executing {scheduleId} in {delay}ms", scheduleId, delay);
                 while (delay > 0)
                 {
@@ -82,7 +82,7 @@ public class Executor
             {
                 _logger.LogError("ScheduleId does not exist in the _jobSchedules {scheduleId}", scheduleId);
             }
-        }, cancellationTokenSource.Token); //.ConfigureAwait(false);
+        }, cancellationTokenSource.Token);
 
         JobSchedules.TryAdd(scheduleId, cancellationTokenSource);
         return (scheduleId, task);
