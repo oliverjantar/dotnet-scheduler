@@ -10,7 +10,7 @@ namespace scheduler.tests;
 public class ExecutorTests
 {
     [Fact]
-    public async void ExecutesScheduledFunction()
+    public async void ExecuteScheduledFunction()
     {
         var logger = new Mock<ILogger<Executor>>();
         var executor = new Executor(logger.Object);
@@ -26,7 +26,7 @@ public class ExecutorTests
         mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
     }
-    
+
     [Fact]
     public async void VerifyCallbackIsExecutedEvenWhenTaskIsNotAwaited()
     {
@@ -43,5 +43,34 @@ public class ExecutorTests
 
         mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+    }
+
+    [Fact]
+    public async void CancelScheduledFunction()
+    {
+        var logger = new Mock<ILogger<Executor>>();
+        var executor = new Executor(logger.Object);
+        var mockCallback = new Mock<Func<CancellationToken, Task>>();
+
+        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow.AddDays(1), mockCallback.Object);
+
+        Assert.NotEqual(Guid.Empty, scheduleId);
+        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
+        
+        Assert.True(executor.Cancel(scheduleId));
+
+        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+        
+        await task; //task ends immediately, it won't wait for 1 day
+        Assert.Equal(TaskStatus.RanToCompletion, task.Status);
+
+        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
+        // void Fn() => executor.Cancel(scheduleId);
+        //
+        // Exception exception = Assert.Throws<Exception>((Action)Fn);
+        //
+        // Assert.Equal("",exception.Message);
+
+        // Assert.Throws<Exception>(() => executor.Cancel(scheduleId));
     }
 }

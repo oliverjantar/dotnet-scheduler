@@ -31,6 +31,9 @@ public class Executor
         var cancellationTokenSource = new CancellationTokenSource();
         var scheduleId = Guid.NewGuid();
 
+        _logger.LogInformation("Scheduling a function to be executed at {next}, scheduleId: {scheduleId}", next,
+            scheduleId);
+
         TimeSpan timeSpan = next - DateTime.UtcNow;
 
         var task = Task.Run(async delegate
@@ -39,48 +42,42 @@ public class Executor
             {
                 //Task.Delay takes UInt32, max value is ~49 days. If task is scheduled for more than that, it needs to be delayed several times in a loop.
                 var delay = timeSpan.TotalMilliseconds;
-                _logger.LogInformation("Executing {scheduleId} in {delay}ms", scheduleId, delay);
                 while (delay > 0)
                 {
                     var currentDelay = delay > UInt32.MaxValue - 1 ? UInt32.MaxValue - 1 : delay;
                     await Task.Delay(TimeSpan.FromMilliseconds((UInt32)currentDelay), cancellationTokenSource.Token);
                     delay -= currentDelay;
                 }
-            }
-            catch (AggregateException e)
-            {
-                //can this happen, isn't exception enough?
-                foreach (var ex in e.InnerExceptions)
-                {
-                    _logger.LogError(ex, "Aggregate exception while scheduling job {scheduleId}", scheduleId);
-                }
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Exception happened while scheduling job {scheduleId}", scheduleId);
-            }
 
-            try
-            {
-                _logger.LogInformation("Executing callback for schedule {scheduleId}", scheduleId);
+                _logger.LogInformation("Executing function, scheduleId: {scheduleId}", scheduleId);
                 await callback(cancellationTokenSource.Token);
+                _logger.LogInformation("Function executed successfully, scheduleId: {scheduleId}", scheduleId);
+            }
+            catch (TaskCanceledException e)
+            {
+                _logger.LogInformation(e, "Scheduled function was cancelled, scheduleId: {scheduleId}", scheduleId);
             }
             catch (AggregateException e)
             {
                 foreach (var ex in e.InnerExceptions)
                 {
                     //handle properly if task was cancelled
-                    _logger.LogError(e, "Aggregate exception while executing callback {scheduleId}", scheduleId);
+                    _logger.LogError(e, "Aggregate exception while executing function, scheduleId: {scheduleId}",
+                        scheduleId);
                 }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Exception happened while executing callback {scheduleId}", scheduleId);
+                _logger.LogError(e,
+                    "Exception happened while scheduling or executing function, scheduleId: {scheduleId}", scheduleId);
             }
-
-            if (!JobSchedules.TryRemove(scheduleId, out _))
+            finally
             {
-                _logger.LogError("ScheduleId does not exist in the _jobSchedules {scheduleId}", scheduleId);
+                if (!JobSchedules.TryRemove(scheduleId, out _))
+                {
+                    _logger.LogError("ScheduleId does not exist in the JobSchedules, scheduleId: {scheduleId}",
+                        scheduleId);
+                }
             }
         }, cancellationTokenSource.Token);
 
@@ -93,5 +90,14 @@ public class Executor
         if (!JobSchedules.TryRemove(scheduleId, out var cts) || !cts.Token.CanBeCanceled) return false;
         cts.Cancel();
         return true;
+    }
+
+    internal void CancelAll()
+    {
+        foreach (var schedules in JobSchedules)
+        {
+            _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", schedules.Key);
+            schedules.Value.Cancel();
+        }
     }
 }
