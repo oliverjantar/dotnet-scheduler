@@ -86,4 +86,29 @@ public class ExecutorTests
 
         Assert.False(executor.Cancel(scheduleId));
     }
+
+    [Fact(Skip = "NotImplemented")]
+    public async void ScheduledFunctionThrowsExceptionInExecution()
+    {
+        Assert.False(true);
+    }
+
+    [Fact(Skip = "NotImplemented")]
+    public async void CancellAllScheduledFunctions()
+    {
+        Assert.False(true);
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void CancelScheduledFunctionDuringExecution()
+    {
+        Assert.False(true);
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void HandleMoreSchedules()
+    {
+        Assert.False(true);
+    }
+    
 }
