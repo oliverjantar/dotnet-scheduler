@@ -65,12 +65,25 @@ public class ExecutorTests
         Assert.Equal(TaskStatus.RanToCompletion, task.Status);
 
         mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
-        // void Fn() => executor.Cancel(scheduleId);
-        //
-        // Exception exception = Assert.Throws<Exception>((Action)Fn);
-        //
-        // Assert.Equal("",exception.Message);
+    }
+    
+    [Fact]
+    public async void ExecutedScheduleCannotBeCancelled()
+    {
+        var logger = new Mock<ILogger<Executor>>();
+        var executor = new Executor(logger.Object);
+        var mockCallback = new Mock<Func<CancellationToken, Task>>();
 
-        // Assert.Throws<Exception>(() => executor.Cancel(scheduleId));
+        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow, mockCallback.Object);
+
+        Assert.NotEqual(Guid.Empty, scheduleId);
+        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
+
+        await task;
+
+        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+
+        Assert.False(executor.Cancel(scheduleId));
     }
 }
