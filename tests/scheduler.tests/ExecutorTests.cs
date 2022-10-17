@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -9,82 +10,107 @@ namespace scheduler.tests;
 
 public class ExecutorTests
 {
+    private readonly Mock<ILogger<Executor>> _mockLogger;
+    private readonly Executor _executor;
+    private readonly Mock<Func<CancellationToken, Task>> _mockCallback;
+    public ExecutorTests()
+    {
+        _mockLogger = new Mock<ILogger<Executor>>();
+        _executor = new Executor(_mockLogger.Object);
+        _mockCallback = new Mock<Func<CancellationToken, Task>>();
+    }
+
     [Fact]
     public async void ExecuteScheduledFunction()
     {
-        var logger = new Mock<ILogger<Executor>>();
-        var executor = new Executor(logger.Object);
-        var mockCallback = new Mock<Func<CancellationToken, Task>>();
-
-        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow, mockCallback.Object);
+        var next = DateTime.UtcNow;
+        var (scheduleId, task) = _executor.Schedule(next, _mockCallback.Object);
 
         Assert.NotEqual(Guid.Empty, scheduleId);
-        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
-
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
+        
+        //Todo: verify logging information
+        // _mockLogger.VerifyLogging($"Scheduling a function to be executed at {next.ToLongDateString()}, scheduleId: {scheduleId}",
+        //     LogLevel.Information, Times.Once());
+        
         await task;
 
-        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
-        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+        _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
     }
 
     [Fact]
     public async void VerifyCallbackIsExecutedEvenWhenTaskIsNotAwaited()
     {
-        var logger = new Mock<ILogger<Executor>>();
-        var executor = new Executor(logger.Object);
-        var mockCallback = new Mock<Func<CancellationToken, Task>>();
-
-        var (scheduleId, _) = executor.Schedule(DateTime.UtcNow.AddMilliseconds(100), mockCallback.Object);
+        var (scheduleId, _) = _executor.Schedule(DateTime.UtcNow.AddMilliseconds(100), _mockCallback.Object);
 
         Assert.NotEqual(Guid.Empty, scheduleId);
-        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
 
         await Task.Delay(TimeSpan.FromMilliseconds(200));
 
-        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
-        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+        _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
     }
 
     [Fact]
     public async void CancelScheduledFunction()
     {
-        var logger = new Mock<ILogger<Executor>>();
-        var executor = new Executor(logger.Object);
-        var mockCallback = new Mock<Func<CancellationToken, Task>>();
-
-        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow.AddDays(1), mockCallback.Object);
+        var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow.AddDays(1), _mockCallback.Object);
 
         Assert.NotEqual(Guid.Empty, scheduleId);
-        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
         
-        Assert.True(executor.Cancel(scheduleId));
+        Assert.True(_executor.Cancel(scheduleId));
 
-        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
         
-        await task; //task ends immediately, it won't wait for 1 day
-        Assert.Equal(TaskStatus.RanToCompletion, task.Status);
+        await Assert.ThrowsAsync<TaskCanceledException>(()=> task); //task ends immediately, it won't wait for 1 day
+        Assert.Equal(TaskStatus.Canceled, task.Status);
+        Assert.True(task.IsCanceled);
 
-        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
+        _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
     }
     
     [Fact]
     public async void ExecutedScheduleCannotBeCancelled()
     {
-        var logger = new Mock<ILogger<Executor>>();
-        var executor = new Executor(logger.Object);
-        var mockCallback = new Mock<Func<CancellationToken, Task>>();
-
-        var (scheduleId, task) = executor.Schedule(DateTime.UtcNow, mockCallback.Object);
+        var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow, _mockCallback.Object);
 
         Assert.NotEqual(Guid.Empty, scheduleId);
-        Assert.True(executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
 
         await task;
 
-        mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
-        Assert.False(executor.JobSchedules.ContainsKey(scheduleId));
+        _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
 
-        Assert.False(executor.Cancel(scheduleId));
+        Assert.False(_executor.Cancel(scheduleId));
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void DisposeOfSchedulerEndsScheduledTasks()
+    {
+        
+        Task task1, task2;
+        CancellationTokenSource cts1, cts2;
+        {
+            var executor = new Executor(_mockLogger.Object);
+            (var scheduleId1, task1) = executor.Schedule(DateTime.UtcNow.AddMinutes(1), _mockCallback.Object);
+            (var scheduleId2, task2) = executor.Schedule(DateTime.UtcNow.AddMinutes(2), _mockCallback.Object);
+
+            cts1 = executor.JobSchedules[scheduleId1];
+            cts2 = executor.JobSchedules[scheduleId2];
+        }
+        
+        Assert.True(task1.IsCanceled);
+        Assert.True(task2.IsCanceled);
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void CancelTaskWhenItExecutesCallback()
+    {
+        Assert.False(true);
     }
 
     [Fact(Skip = "NotImplemented")]
@@ -110,5 +136,6 @@ public class ExecutorTests
     {
         Assert.False(true);
     }
-    
+
+  
 }

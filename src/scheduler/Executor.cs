@@ -9,10 +9,11 @@ namespace scheduler;
 /// <summary>
 /// Class responsible for scheduling and executing functions at a given time.
 /// </summary>
-public class Executor
+public class Executor: IDisposable
 {
     private readonly ILogger<Executor> _logger;
     internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> JobSchedules;
+    internal bool _isDisposed;
 
     public Executor(ILogger<Executor> logger)
     {
@@ -55,21 +56,26 @@ public class Executor
             }
             catch (TaskCanceledException e)
             {
-                _logger.LogInformation(e, "Scheduled function was cancelled, scheduleId: {scheduleId}", scheduleId);
+                _logger.LogError(e, "Scheduled function was cancelled, scheduleId: {scheduleId}",
+                    scheduleId);
+                throw;
             }
             catch (AggregateException e)
             {
                 foreach (var ex in e.InnerExceptions)
                 {
-                    //handle properly if task was cancelled
-                    _logger.LogError(e, "Aggregate exception while executing function, scheduleId: {scheduleId}",
+                    _logger.LogError(ex, "Aggregate exception while executing function, scheduleId: {scheduleId}",
                         scheduleId);
                 }
+
+                throw;
             }
             catch (Exception e)
             {
                 _logger.LogError(e,
-                    "Exception happened while scheduling or executing function, scheduleId: {scheduleId}", scheduleId);
+                    "Exception happened while scheduling or executing function, scheduleId: {scheduleId}",
+                    scheduleId);
+                throw;
             }
             finally
             {
@@ -91,6 +97,8 @@ public class Executor
         cts.Cancel();
         return true;
     }
+    
+    
 
     internal void CancelAll()
     {
@@ -98,6 +106,16 @@ public class Executor
         {
             _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", schedules.Key);
             schedules.Value.Cancel();
+            
+            //Todo: if task is not finished, then kill it
         }
+    }
+
+    public void Dispose()
+    {
+        if(!_isDisposed)
+            CancelAll();
+
+        _isDisposed = true;
     }
 }
