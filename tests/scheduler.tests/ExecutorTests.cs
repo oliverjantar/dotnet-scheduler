@@ -67,7 +67,7 @@ public class ExecutorTests
         
         await Assert.ThrowsAsync<TaskCanceledException>(()=> task); //task ends immediately, it won't wait for 1 day
         Assert.Equal(TaskStatus.Canceled, task.Status);
-        Assert.True(task.IsCanceled);
+        Assert.Null(task.Exception);
 
         _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -99,8 +99,8 @@ public class ExecutorTests
             (var scheduleId1, task1) = executor.Schedule(DateTime.UtcNow.AddMinutes(1), _mockCallback.Object);
             (var scheduleId2, task2) = executor.Schedule(DateTime.UtcNow.AddMinutes(2), _mockCallback.Object);
 
-            cts1 = executor.JobSchedules[scheduleId1];
-            cts2 = executor.JobSchedules[scheduleId2];
+            // cts1 = executor.JobSchedules[scheduleId1];
+            // cts2 = executor.JobSchedules[scheduleId2];
         }
         
         Assert.True(task1.IsCanceled);
@@ -109,6 +109,12 @@ public class ExecutorTests
     
     [Fact(Skip = "NotImplemented")]
     public async void CancelTaskWhenItExecutesCallback()
+    {
+        Assert.False(true);
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void TaskIsAbortedWhenCancelRequestIsIgnored()
     {
         Assert.False(true);
     }

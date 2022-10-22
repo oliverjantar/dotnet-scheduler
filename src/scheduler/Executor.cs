@@ -12,13 +12,13 @@ namespace scheduler;
 public class Executor: IDisposable
 {
     private readonly ILogger<Executor> _logger;
-    internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> JobSchedules;
+    internal readonly ConcurrentDictionary<Guid, (Task,CancellationTokenSource)> JobSchedules;
     internal bool _isDisposed;
 
     public Executor(ILogger<Executor> logger)
     {
         _logger = logger;
-        JobSchedules = new ConcurrentDictionary<Guid, CancellationTokenSource>();
+        JobSchedules = new ConcurrentDictionary<Guid, (Task,CancellationTokenSource)>();
     }
 
     /// <summary>
@@ -54,27 +54,26 @@ public class Executor: IDisposable
                 await callback(cancellationTokenSource.Token);
                 _logger.LogInformation("Function executed successfully, scheduleId: {scheduleId}", scheduleId);
             }
-            catch (TaskCanceledException e)
-            {
-                _logger.LogError(e, "Scheduled function was cancelled, scheduleId: {scheduleId}",
-                    scheduleId);
-                throw;
-            }
-            catch (AggregateException e)
-            {
-                foreach (var ex in e.InnerExceptions)
-                {
-                    _logger.LogError(ex, "Aggregate exception while executing function, scheduleId: {scheduleId}",
-                        scheduleId);
-                }
-
-                throw;
-            }
             catch (Exception e)
             {
-                _logger.LogError(e,
-                    "Exception happened while scheduling or executing function, scheduleId: {scheduleId}",
-                    scheduleId);
+                if (e is TaskCanceledException)
+                {
+                    _logger.LogError(e, "Scheduled function was cancelled, scheduleId: {scheduleId}",
+                        scheduleId);
+                }
+                else if (e is AggregateException ex)
+                {
+                    foreach (var innerEx in ex.InnerExceptions)
+                    {
+                        _logger.LogError(innerEx, "Aggregate exception while executing function, scheduleId: {scheduleId}",
+                            scheduleId);
+                    }
+                }
+                else{
+                    _logger.LogError(e,
+                        "Exception happened while scheduling or executing function, scheduleId: {scheduleId}",
+                        scheduleId);
+                }
                 throw;
             }
             finally
@@ -87,27 +86,28 @@ public class Executor: IDisposable
             }
         }, cancellationTokenSource.Token);
 
-        JobSchedules.TryAdd(scheduleId, cancellationTokenSource);
+        JobSchedules.TryAdd(scheduleId, (task,cancellationTokenSource));
         return (scheduleId, task);
     }
 
     public bool Cancel(Guid scheduleId)
     {
-        if (!JobSchedules.TryRemove(scheduleId, out var cts) || !cts.Token.CanBeCanceled) return false;
-        cts.Cancel();
+        //Todo: check if task is not cancelled.
+        if (!JobSchedules.TryRemove(scheduleId, out var value) || !value.Item2.Token.CanBeCanceled) return false;
+        value.Item2.Cancel();
+        
+        //Todo: kill task if not responding to cancellation request.
         return true;
     }
     
-    
-
     internal void CancelAll()
     {
         foreach (var schedules in JobSchedules)
         {
             _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", schedules.Key);
-            schedules.Value.Cancel();
+            schedules.Value.Item2.Cancel();
             
-            //Todo: if task is not finished, then kill it
+            //Todo: if task is not responding to cancellation request, abort it
         }
     }
 
