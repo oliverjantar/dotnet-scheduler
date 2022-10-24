@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -102,8 +101,6 @@ public class ExecutorTests
     public async void DisposeOfSchedulerEndsScheduledTask()
     {
         Task task;
-
-
         using (var executor = new Executor(_mockLogger.Object))
         {
             (_, task) = executor.Schedule(DateTime.UtcNow.AddMinutes(1), _mockCallback.Object);
@@ -116,10 +113,29 @@ public class ExecutorTests
         _mockCallback.Verify(x => x(It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact(Skip = "NotImplemented")]
+    [Fact]
     public async void CancelTaskWhenItExecutesCallback()
     {
-        Assert.False(true);
+        var finished = false;
+        var longRunningTask = async (CancellationToken ct) =>
+        {
+            await Task.Delay(TimeSpan.FromDays(1), ct);
+            finished = true;
+        };
+        
+        var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow, longRunningTask);
+       
+        Assert.NotEqual(Guid.Empty, scheduleId);
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
+
+        Assert.True(_executor.Cancel(scheduleId));
+
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
+        
+        await Assert.ThrowsAsync<TaskCanceledException>(() => task);
+        Assert.Equal(TaskStatus.Canceled, task.Status);
+        Assert.Null(task.Exception);
+        Assert.False(finished);
     }
 
     [Fact(Skip = "NotImplemented")]
