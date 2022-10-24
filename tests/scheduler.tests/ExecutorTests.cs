@@ -144,8 +144,25 @@ public class ExecutorTests
         Assert.False(true);
     }
 
-    [Fact(Skip = "NotImplemented")]
+    [Fact]
     public async void ScheduledFunctionThrowsExceptionInExecution()
+    {
+        var errMessage = "Something horribly went wrong";
+        Func<CancellationToken,Task> alwaysFailingTask = (CancellationToken ct) => throw new Exception(errMessage);
+        
+        var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow.AddMilliseconds(200), alwaysFailingTask);
+       
+        Assert.NotEqual(Guid.Empty, scheduleId);
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
+
+        await Assert.ThrowsAsync<Exception>(() => task);
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.Equal(TaskStatus.Faulted, task.Status);
+        Assert.Equal(errMessage,task.Exception.InnerExceptions[0].Message);
+    }
+    
+    [Fact(Skip = "NotImplemented")]
+    public async void ThrowAggregateExceptionWhenExecutingSchedule()
     {
         Assert.False(true);
     }
