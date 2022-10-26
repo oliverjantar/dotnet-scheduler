@@ -138,16 +138,10 @@ public class ExecutorTests
         Assert.False(finished);
     }
 
-    [Fact(Skip = "NotImplemented")]
-    public async void TaskIsAbortedWhenCancelRequestIsIgnored()
-    {
-        Assert.False(true);
-    }
-
     [Fact]
     public async void ScheduledFunctionThrowsExceptionInExecution()
     {
-        var errMessage = "Something horribly went wrong";
+        var errMessage = "Something went wrong";
         Func<CancellationToken,Task> alwaysFailingTask = (CancellationToken ct) => throw new Exception(errMessage);
         
         var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow.AddMilliseconds(200), alwaysFailingTask);
@@ -161,8 +155,36 @@ public class ExecutorTests
         Assert.Equal(errMessage,task.Exception.InnerExceptions[0].Message);
     }
     
+    [Fact]
+    public async void ScheduledFunctionThrowsAggregateExceptionWhenExecutingMultipleTasks()
+    {
+        var errMessage = "Something went wrong";
+        //Schedule here represents some complex function where one of its subtask can fail and throw exception.
+        //Then AggregateException is thrown from that schedule function that needs to be properly handled in schedule executor.
+        Func<CancellationToken, Task> schedule = (CancellationToken ct) =>
+        {
+            var t1 = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100),ct);
+                throw new Exception(errMessage);
+            });
+            
+            return Task.Run( ()=>Task.WaitAll(t1), ct);
+        };
+
+        var (scheduleId, task) = _executor.Schedule(DateTime.UtcNow.AddMilliseconds(200), schedule);
+       
+        Assert.NotEqual(Guid.Empty, scheduleId);
+        Assert.True(_executor.JobSchedules.ContainsKey(scheduleId));
+
+        await Assert.ThrowsAsync<AggregateException>(() => task);
+        Assert.False(_executor.JobSchedules.ContainsKey(scheduleId));
+        Assert.Equal(TaskStatus.Faulted, task.Status);
+        Assert.Equal(errMessage,task.Exception.InnerExceptions[0].InnerException.Message);
+    }
+    
     [Fact(Skip = "NotImplemented")]
-    public async void ThrowAggregateExceptionWhenExecutingSchedule()
+    public async void TaskIsAbortedWhenCancelRequestIsIgnored()
     {
         Assert.False(true);
     }
