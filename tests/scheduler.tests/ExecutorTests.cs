@@ -182,22 +182,16 @@ public class ExecutorTests
         Assert.Equal(TaskStatus.Faulted, task.Status);
         Assert.Equal(errMessage,task.Exception.InnerExceptions[0].InnerException.Message);
     }
-    
-    [Fact(Skip = "NotImplemented")]
-    public async void TaskIsAbortedWhenCancelRequestIsIgnored()
-    {
-        Assert.False(true);
-    }
 
-    [Fact(Skip = "NotImplemented")]
-    public async void CancellAllScheduledFunctions()
+    [Fact]
+    async void DisposedExecutorCannotBeUsed()
     {
-        Assert.False(true);
-    }
+        _executor.Dispose();
+        Assert.True(_executor._isDisposed);
+        Assert.Throws<ObjectDisposedException>(() => _executor.Schedule(DateTime.UtcNow, _mockCallback.Object));
 
-    [Fact(Skip = "NotImplemented")]
-    public async void HandleMoreSchedules()
-    {
-        Assert.False(true);
+        Assert.Throws<ObjectDisposedException>(()=>_executor.CancelAll());
+        
+        Assert.Throws<ObjectDisposedException>(()=>_executor.Cancel(Guid.Empty));
     }
 }

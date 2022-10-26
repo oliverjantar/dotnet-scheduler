@@ -29,6 +29,9 @@ public class Executor : IDisposable
     /// <returns>Id of the scheduled function. Task of a scheduled function - it is used only in tests, in production it works as fire and forget</returns>
     public (Guid, Task) Schedule(DateTime next, Func<CancellationToken, Task> callback)
     {
+        if (_isDisposed)
+            throw new ObjectDisposedException("Executor");
+        
         var cancellationTokenSource = new CancellationTokenSource();
         var scheduleId = Guid.NewGuid();
 
@@ -95,23 +98,23 @@ public class Executor : IDisposable
 
     public bool Cancel(Guid scheduleId)
     {
-        //Todo: check if task is not cancelled.
+        if (_isDisposed)
+            throw new ObjectDisposedException("Executor");
+        
         if (!JobSchedules.TryRemove(scheduleId, out var value) || !value.Item2.Token.CanBeCanceled) return false;
+        _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", scheduleId);
         value.Item2.Cancel();
-
-        //Todo: kill task if not responding to cancellation request.
+        
         return true;
     }
 
     internal void CancelAll()
     {
-        foreach (var schedules in JobSchedules)
-        {
-            _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", schedules.Key);
-            schedules.Value.Item2.Cancel();
-
-            //Todo: if task is not responding to cancellation request, abort it
-        }
+        if (_isDisposed)
+            throw new ObjectDisposedException("Executor");
+        
+        foreach (var schedule in JobSchedules)
+            Cancel(schedule.Key);
     }
 
     public void Dispose()
