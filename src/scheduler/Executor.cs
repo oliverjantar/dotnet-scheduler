@@ -12,13 +12,13 @@ namespace scheduler;
 public class Executor : IDisposable
 {
     private readonly ILogger<Executor> _logger;
-    internal readonly ConcurrentDictionary<Guid, (Task, CancellationTokenSource)> JobSchedules;
+    internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> JobSchedules;
     internal bool _isDisposed;
 
     public Executor(ILogger<Executor> logger)
     {
         _logger = logger;
-        JobSchedules = new ConcurrentDictionary<Guid, (Task, CancellationTokenSource)>();
+        JobSchedules = new ConcurrentDictionary<Guid, CancellationTokenSource>();
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public class Executor : IDisposable
             }
         }, cancellationTokenSource.Token);
 
-        JobSchedules.TryAdd(scheduleId, (task, cancellationTokenSource));
+        JobSchedules.TryAdd(scheduleId, cancellationTokenSource);
         return (scheduleId, task);
     }
 
@@ -101,10 +101,10 @@ public class Executor : IDisposable
         if (_isDisposed)
             throw new ObjectDisposedException("Executor");
         
-        if (!JobSchedules.TryRemove(scheduleId, out var value) || !value.Item2.Token.CanBeCanceled) return false;
+        if (!JobSchedules.TryRemove(scheduleId, out var value) || !value.Token.CanBeCanceled) return false;
         _logger.LogInformation("Cancelling scheduled function, scheduleId: {scheduleId}", scheduleId);
-        value.Item2.Cancel();
-        
+        value.Cancel();
+
         return true;
     }
 
