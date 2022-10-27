@@ -38,7 +38,7 @@ public class Executor : IDisposable
         _logger.LogInformation("Scheduling a function to be executed at {next}, scheduleId: {scheduleId}", next,
             scheduleId);
 
-        TimeSpan timeSpan = next - DateTime.UtcNow;
+        var timeSpan = next - DateTime.UtcNow;
 
         var task = Task.Run(async delegate
         {
@@ -48,8 +48,8 @@ public class Executor : IDisposable
                 var delay = timeSpan.TotalMilliseconds;
                 while (delay > 0)
                 {
-                    var currentDelay = delay > UInt32.MaxValue - 1 ? UInt32.MaxValue - 1 : delay;
-                    await Task.Delay(TimeSpan.FromMilliseconds((UInt32)currentDelay), cancellationTokenSource.Token);
+                    var currentDelay = delay > uint.MaxValue - 1 ? uint.MaxValue - 1 : delay;
+                    await Task.Delay(TimeSpan.FromMilliseconds((uint)currentDelay), cancellationTokenSource.Token);
                     delay -= currentDelay;
                 }
 
