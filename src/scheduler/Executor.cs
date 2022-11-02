@@ -29,6 +29,7 @@ public class Executor : IDisposable
     /// <returns>Id of the scheduled function. Task of a scheduled function - it is used only in tests, in production it works as fire and forget</returns>
     public (Guid, Task) Schedule(DateTime next, Func<CancellationToken, Task> callback)
     {
+        
         if (_isDisposed)
             throw new ObjectDisposedException("Executor");
         
